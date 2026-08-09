@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>notes</title>
+<style>
+  /* ════════════════════════════════════════════════════════════════
+     t-rec/notes · 前端對齊 b-rec / lib-rec 家族語言
+       · sans-serif 正文（非等寬）、line-height 1.6
+       · 280px fixed sidebar + ❯/❮ edge toggle + 置中 800px 內容欄
+       · token 命名與骨架同 b-rec：--bg / --fg / --accent / --muted / --line
+     代表色：--accent #00ff5e（notes 系統綠；b-rec 系統藍 #0000ff、lib-rec 系統紅 #fc036b）
+
+     ⚠️ #00ff5e 在白底上的對比只有約 1.3:1 —— **不能拿來寫字**。
+        所以家族語言中「accent 當文字色」的位置，這裡一律改用「accent 當底、黑字」，
+        對比約 15:1。仍是單一強調色，沒有引入第二色。
+     ════════════════════════════════════════════════════════════════ */
+  :root {
+    --bg: white;
+    --fg: black;
+    --accent: #00ff5e;                  /* 系統綠 */
+    --accent-t: rgba(0, 255, 94, 0.14); /* 同色淡底（tint），非第二色 */
+    --accent-t2: rgba(0, 255, 94, 0.26);
+    --muted: #888;
+    --line: #e0e0e0;
+    --sb-w: 280px;
+    --content-w: 800px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  /* [NOTES::NO_SMOOTH_SCROLL] 任何 scroll 行為走 instant — 不要平滑 */
+  html { scroll-behavior: auto; }
+  body {
+    font-family: -apple-system, "Segoe UI", "PingFang TC", sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.6;
+  }
+  ::selection { background: var(--accent); color: #000; }
+
+  /* sidebar 開時把 content 整片右推 — sidebar 是 fixed、不被推 */
+  body.with-sidebar { padding-left: var(--sb-w); }
+
+  /* ── sidebar ── */
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: var(--sb-w);
+    background: var(--bg);
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+    padding: 1.25rem 0 2rem;
+    transform: translateX(-100%);
+    z-index: 80;
+    display: flex;
+    flex-direction: column;
+  }
+  body.with-sidebar .sidebar { transform: translateX(0); }
+
+  /* search row — accent 淡底 input，外圍 3px padding（右側 +3 偏移）、＋ 在同行左 */
+  .note-search-input {
+    padding: 3px 6px 3px 3px;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .sidebar-new-btn {
+    flex-shrink: 0;
+    padding: 2px 6px;
+    font: inherit;
+    font-size: 0.95rem;
+    line-height: 1;
+    color: var(--muted);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+  }
+  .sidebar-new-btn:hover { background: var(--accent); color: #000; }
+  .note-search-input input {
+    flex: 1; min-width: 0;
+    margin-left: -2px;
+    padding: 2px 6px;
+    border: 0;
+    background: var(--accent-t);
+    font: inherit;
+    font-size: 0.85rem;
+    color: var(--fg);
+    outline: none;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .note-search-input input:hover { background: var(--accent-t2); }
+  }
+  @media (hover: none) {
+    .note-search-input input:focus { background: var(--accent-t2); }
+  }
+  .note-search-input input::placeholder { color: var(--muted); }
+
+  .sidebar-header {
+    padding: 0.6rem 1.25rem 0.3rem;
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── note list（骨架同 b-rec ul.summary）── */
+  ul.summary { list-style: none; padding: 0; margin: 0; flex: 1; }
+  ul.summary li { margin: 0; }
+  .note-item {
+    position: relative;
+    display: block;
+    padding: 0.35rem 2rem 0.35rem 1.25rem;
+    font-size: 0.88rem;
+    line-height: 1.4;
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .note-item:hover { background: var(--accent-t); }
+  /* accent 當文字色不可讀 → active 走「accent 當底、黑字」 */
+  .note-item.active { background: var(--accent); color: #000; }
+  .note-item .title {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .note-item .time {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--muted);
+    line-height: 1.3;
+  }
+  .note-item.active .time { color: rgba(0, 0, 0, 0.55); }
+
+  /* delete × — ambient：預設藏、hover 條目才出 */
+  .note-del {
+    position: absolute;
+    top: 50%; right: 0.6rem;
+    transform: translateY(-50%);
+    padding: 0 4px;
+    font: inherit;
+    font-size: 0.85rem;
+    line-height: 1.3;
+    color: var(--muted);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    opacity: 0;
+  }
+  .note-item:hover .note-del { opacity: 1; }
+  .note-del:hover { background: var(--accent); color: #000; }
+
+  .list-empty {
+    padding: 0.35rem 1.25rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  /* ── sidebar toggle (edge ❯/❮，同 lib-rec) ── */
+  .sidebar-toggle {
+    position: fixed;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    z-index: 90;
+    background: transparent;
+    border: 0;
+    padding: 8px 6px;
+    font: inherit;
+    font-size: 16px;
+    line-height: 1;
+    color: rgba(28, 28, 28, 0.42);
+    cursor: pointer;
+  }
+  .sidebar-toggle:hover { color: var(--fg); }
+  .sidebar-toggle::before { content: "\276F"; }                    /* ❯ */
+  body.with-sidebar .sidebar-toggle { left: var(--sb-w); }
+  body.with-sidebar .sidebar-toggle::before { content: "\276E"; }  /* ❮ */
+
+  /* ── [NOTES::VIEW_TOGGLE] 版式切換 ≡(單筆編輯)/⇊(流式瀑布) — 骨架同 b-rec .view-toggle ──
+     按鈕上顯示的是「切過去會變成的版式」，不是當前版式（同 b-rec 慣例）。 */
+  .view-toggle {
+    position: fixed;
+    top: 2px; right: 2px;
+    z-index: 60;
+    padding: 4px 6px;
+    font: inherit; font-size: 14px; line-height: 1;
+    color: var(--muted);
+    background: transparent; border: 0; cursor: pointer;
+  }
+  .view-toggle:hover { color: var(--fg); }
+
+  /* ── main content · 永遠置中、寬度 800px（同 b-rec .container）── */
+  .container {
+    max-width: var(--content-w);
+    margin: 0 auto;
+    padding: 3rem 2rem 4rem;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+  }
+
+  /* ── flow view：所有筆記一次攤開的瀑布卡片 ──
+     用 CSS columns 做 masonry（零 JS 排版）；卡片維持 b-rec 的方框感：1px 直角框、無圓角、無陰影。 */
+  #flow { display: none; }
+  body.view-flow #content { display: none; }
+  body.view-flow #flow { display: block; }
+  body.view-flow .container {
+    max-width: 1200px;
+    display: block;
+    padding: 2.5rem 2rem 4rem;
+  }
+  /* flow 攤開全部筆記 → sidebar 冗餘，收起來讓出整片畫布 */
+  body.view-flow { padding-left: 0; }
+  body.view-flow .sidebar,
+  body.view-flow .sidebar-toggle { display: none; }
+
+  #flow {
+    columns: 250px;
+    column-gap: 12px;
+  }
+  .card {
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+    margin: 0 0 12px;
+    border: 1px solid var(--line);
+    padding: 0.65rem 0.8rem 1.5rem;
+    position: relative;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+    cursor: pointer;
+  }
+  .card:hover,
+  .card.active { border-color: var(--accent); }
+  .card-empty { color: var(--muted); }
+
+  /* 右下角 ＋ / − ：收放全文。只有超過 COLLAPSE_CHARS 的卡片才有 */
+  .card-toggle {
+    position: absolute;
+    right: 3px; bottom: 1px;
+    padding: 0 5px;
+    font: inherit;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--muted);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+  }
+  .card-toggle:hover { background: var(--accent); color: #000; }
+
+  /* 空白新增格：無框（與有內容的卡片區隔） */
+  .card-add {
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+    margin: 0 0 12px;
+    border: 0;
+    padding: 0.65rem;
+    min-height: 62px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font: inherit;
+    font-size: 18px;
+    line-height: 1;
+    color: var(--muted);
+    background: transparent;
+    cursor: pointer;
+  }
+  .card-add:hover { background: var(--accent-t); color: #000; }
+  #content {
+    flex: 1;
+    border: 0;
+    outline: none;
+    resize: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--fg);
+    caret-color: var(--accent);
+  }
+  #content::placeholder { color: var(--muted); }
+
+  /* ── mobile：sidebar 覆蓋而非推擠 ── */
+  @media (max-width: 767px) {
+    body.with-sidebar { padding-left: 0; }
+    .sidebar { width: min(var(--sb-w), 84vw); box-shadow: 0 0 0 100vmax rgba(0,0,0,0.18); }
+    body:not(.with-sidebar) .sidebar { box-shadow: none; }
+    body.with-sidebar .sidebar-toggle { left: min(var(--sb-w), 84vw); }
+    .container { padding: 2.5rem 1.25rem 3rem; }
+    body.view-flow .container { padding: 2.5rem 1.25rem 3rem; }
+    #flow { columns: 160px; column-gap: 10px; }
+  }
+  /* iOS 防止 focus 自動放大 */
+  @supports (-webkit-touch-callout: none) {
+    input, textarea { font-size: 16px; }
+  }
+</style>
+</head>
+<body class="with-sidebar">
+
+<aside class="sidebar" id="sidebar">
+  <div class="note-search-input">
+    <button class="sidebar-new-btn" id="new-btn" title="new note (n)">＋</button>
+    <input id="search" type="text" placeholder="search" autocomplete="off" spellcheck="false">
+  </div>
+  <div class="sidebar-header">notes</div>
+  <ul class="summary" id="note-list"></ul>
+  <input type="file" id="import-file" accept=".md,.json,text/markdown" hidden>
+</aside>
+
+<button class="sidebar-toggle" id="sidebar-toggle" aria-label="toggle sidebar"></button>
+<button class="view-toggle" id="view-toggle"></button>
+
+<main class="container">
+  <textarea id="content" placeholder="…" spellcheck="false"></textarea>
+  <div id="flow"></div>
+</main>
+
+<script>
+/* ────────────────────────────────────────────────────────────
+   t-rec/notes · single-file SPA · localStorage 唯一 source of truth
+   key: memo.notes.v1（legacy，保留）  shape: [{ id, content, updatedAt }]
+   ──────────────────────────────────────────────────────────── */
+
+const $ = s => document.querySelector(s);
+
+const STATE_KEY = 'memo.notes.v1';   // legacy key，刻意不改：換 key 會丟既有記事
+const CUR_KEY   = 'memo.current.v1'; // 同上
+const SB_KEY    = 'notes.sidebar.v1';// UI 狀態，非資料
+const VIEW_KEY  = 'notes.view.v1';   // 同上：'editor' | 'flow'
+
+const COLLAPSE_CHARS = 140;          // flow 卡片折合時顯示的字元數
+
+let notes = [];         // [{ id, content, updatedAt }]
+let curId = null;
+let saveTimer = null;
+let filter = '';
+let view = 'editor';
+const expanded = new Set();          // flow 中已展開的 note id（僅存記憶體，重載即收合）
+
+/* ── persistence ── */
+function load() {
+  try { notes = JSON.parse(localStorage.getItem(STATE_KEY) || '[]') || []; }
+  catch { notes = []; }
+  curId = localStorage.getItem(CUR_KEY) || null;
+}
+function save() {
+  localStorage.setItem(STATE_KEY, JSON.stringify(notes));
+  if (curId) localStorage.setItem(CUR_KEY, curId);
+}
+
+/* ── helpers ── */
+const newId = () => 'm-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+const esc = s => (s + '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function titleOf(content) {
+  if (!content) return '(empty)';
+  const firstLine = content.split('\n').find(l => l.trim()) || '';
+  return firstLine.trim().slice(0, 40) || '(untitled)';
+}
+function timeAgo(ts) {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 5) return 'just now';
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  return Math.floor(s / 86400) + 'd ago';
+}
+
+/* ── render sidebar list ── */
+function renderList() {
+  const list = $('#note-list');
+  const sorted = notes.slice().sort((a, b) => b.updatedAt - a.updatedAt);
+  const q = filter.trim().toLowerCase();
+  const visible = q ? sorted.filter(n => n.content.toLowerCase().includes(q)) : sorted;
+
+  if (!visible.length) {
+    list.innerHTML = `<li class="list-empty">${q ? 'no match' : 'empty'}</li>`;
+    return;
+  }
+  list.innerHTML = visible.map(n => `
+    <li class="note-item${n.id === curId ? ' active' : ''}" data-id="${n.id}">
+      <span class="title">${esc(titleOf(n.content))}</span>
+      <span class="time">${timeAgo(n.updatedAt)}</span>
+      <button class="note-del" data-del="${n.id}" title="delete">×</button>
+    </li>
+  `).join('');
+}
+
+/* ── render flow view · CSS columns 瀑布，全部筆記一次攤開 ── */
+function renderFlow() {
+  const flow = $('#flow');
+  const sorted = notes.slice().sort((a, b) => b.updatedAt - a.updatedAt);
+
+  const addTile = `<button class="card-add" id="flow-add" title="new note (n)">＋</button>`;
+
+  const cards = sorted.map(n => {
+    const full = n.content;
+    const long = full.length > COLLAPSE_CHARS;
+    const open = expanded.has(n.id);
+    const shown = (!long || open) ? full : full.slice(0, COLLAPSE_CHARS).trimEnd() + '…';
+    const body = full.trim()
+      ? esc(shown)
+      : '<span class="card-empty">(empty)</span>';
+    const toggle = long
+      ? `<button class="card-toggle" data-toggle="${n.id}" title="${open ? 'collapse' : 'expand'}">${open ? '−' : '＋'}</button>`
+      : '';
+    return `<div class="card${n.id === curId ? ' active' : ''}" data-card="${n.id}">${body}${toggle}</div>`;
+  }).join('');
+
+  flow.innerHTML = addTile + cards;
+}
+
+/* ── render editor area ── */
+function renderEditor() {
+  const ta = $('#content');
+  const cur = notes.find(n => n.id === curId);
+  if (!cur) {
+    ta.value = '';
+    ta.disabled = true;
+    ta.placeholder = notes.length ? 'pick a note' : 'press ＋ to start';
+    return;
+  }
+  ta.disabled = false;
+  ta.placeholder = '…';
+  if (ta.value !== cur.content) ta.value = cur.content;
+  if (view === 'editor' && document.activeElement !== ta) ta.focus({ preventScroll: true });
+}
+
+/* ── actions ── */
+function selectNote(id) {
+  curId = id;
+  save();
+  renderList();
+  renderFlow();
+  renderEditor();
+}
+
+function newNote() {
+  const m = { id: newId(), content: '', updatedAt: Date.now() };
+  notes.unshift(m);
+  curId = m.id;
+  save();
+  renderList();
+  renderFlow();
+  renderEditor();
+}
+
+/* 不變式：永遠至少一份筆記。無筆記時自動補一份空白並選中
+   （這同時是空狀態逃生口 —— 見 machine/specs/19-toolbox.md 失敗模式） */
+function ensureNote() {
+  if (notes.length) return false;
+  const m = { id: newId(), content: '', updatedAt: Date.now() };
+  notes.push(m);
+  curId = m.id;
+  save();
+  return true;
+}
+
+function deleteNote(id) {
+  notes = notes.filter(n => n.id !== id);
+  if (curId === id) curId = notes[0]?.id || null;
+  ensureNote();                       // 刪到空 → 自動補一份空白
+  if (!curId) curId = notes[0]?.id || null;
+  save();
+  renderList();
+  renderFlow();
+  renderEditor();
+}
+
+function flush() {
+  const cur = notes.find(n => n.id === curId);
+  if (!cur) return;
+  cur.content = $('#content').value;
+  cur.updatedAt = Date.now();
+  save();
+  renderList();
+  renderFlow();
+}
+
+function scheduleSave() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { saveTimer = null; flush(); }, 400);
+}
+
+/* ── export · single .md with YAML frontmatter blocks ── */
+function exportAll() {
+  if (!notes.length) return;
+  const blocks = notes.slice().sort((a, b) => a.updatedAt - b.updatedAt).map(n => {
+    const fm = `---\nid: ${n.id}\nupdated: ${new Date(n.updatedAt).toISOString()}\n---`;
+    return `${fm}\n${n.content}`.trimEnd();
+  });
+  const blob = new Blob([blocks.join('\n\n')], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `notes-export-${new Date().toISOString().slice(0, 10)}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ── import · 解析帶 YAML frontmatter 的多筆 md，或單筆 ── */
+function importText(text) {
+  const parts = text.split(/^---\s*$/m);
+  const out = [];
+  for (let i = 1; i < parts.length; i += 2) {
+    const fmRaw = parts[i] || '';
+    const bodyRaw = (parts[i + 1] || '').replace(/^\n/, '').replace(/\n$/, '');
+    const idM = fmRaw.match(/id:\s*([^\s]+)/);
+    const upM = fmRaw.match(/updated:\s*([^\s]+)/);
+    out.push({
+      id: idM ? idM[1] : newId(),
+      content: bodyRaw,
+      updatedAt: upM ? Date.parse(upM[1]) || Date.now() : Date.now(),
+    });
+  }
+  if (!out.length && text.trim()) {
+    out.push({ id: newId(), content: text.trim(), updatedAt: Date.now() });
+  }
+  if (!out.length) return;
+
+  // merge：相同 id 蓋過、不同 id 加入
+  const map = new Map(notes.map(n => [n.id, n]));
+  for (const m of out) map.set(m.id, m);
+  notes = [...map.values()];
+  save();
+  renderList();
+  renderFlow();
+  renderEditor();
+}
+
+/* ── sidebar toggle ── */
+function setSidebar(open) {
+  document.body.classList.toggle('with-sidebar', open);
+  localStorage.setItem(SB_KEY, open ? '1' : '0');
+}
+
+/* ── view toggle · 'editor' | 'flow' ──
+   按鈕顯示的是「切過去會變成的版式」（同 b-rec 慣例）：
+   目前在 editor → 顯示 ⇊；目前在 flow → 顯示 ≡ */
+function setView(v) {
+  view = v === 'flow' ? 'flow' : 'editor';
+  document.body.classList.toggle('view-flow', view === 'flow');
+  localStorage.setItem(VIEW_KEY, view);
+  const btn = $('#view-toggle');
+  const nextLabel = view === 'flow' ? '單筆編輯' : '流式瀑布';
+  btn.textContent = view === 'flow' ? '\u2261' : '\u21CA';   // ≡ / ⇊
+  btn.title = '切換為' + nextLabel;
+  btn.setAttribute('aria-label', '切換為' + nextLabel);
+  if (view === 'flow') renderFlow(); else renderEditor();
+}
+
+/* ── wire ── */
+$('#new-btn').addEventListener('click', newNote);
+$('#sidebar-toggle').addEventListener('click', () =>
+  setSidebar(!document.body.classList.contains('with-sidebar')));
+$('#view-toggle').addEventListener('click', () =>
+  setView(view === 'flow' ? 'editor' : 'flow'));
+
+/* flow：＋新增 · 右下 ＋/− 收放全文 · 點卡片進編輯 */
+$('#flow').addEventListener('click', e => {
+  if (e.target.closest('#flow-add')) { newNote(); setView('editor'); return; }
+  const tg = e.target.closest('[data-toggle]');
+  if (tg) {
+    e.stopPropagation();
+    const id = tg.dataset.toggle;
+    expanded.has(id) ? expanded.delete(id) : expanded.add(id);
+    renderFlow();
+    return;
+  }
+  const card = e.target.closest('[data-card]');
+  if (card) { selectNote(card.dataset.card); setView('editor'); }
+});
+
+$('#import-file').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  importText(await file.text());
+  e.target.value = '';
+});
+
+$('#search').addEventListener('input', e => {
+  filter = e.target.value;
+  renderList();
+});
+
+$('#note-list').addEventListener('click', e => {
+  const del = e.target.closest('[data-del]');
+  if (del) { e.stopPropagation(); deleteNote(del.dataset.del); return; }
+  const item = e.target.closest('[data-id]');
+  if (item) selectNote(item.dataset.id);
+});
+
+$('#content').addEventListener('input', scheduleSave);
+$('#content').addEventListener('blur', () => {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; flush(); }
+});
+/* 關頁 / 切分頁前把未寫入的內容存下（debounce 期間關頁會丟字） */
+window.addEventListener('beforeunload', () => {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; flush(); }
+});
+
+/* hotkeys: n = new、e = export、i = import（不在 textarea / input 內） */
+document.addEventListener('keydown', e => {
+  const t = e.target;
+  if (t && typeof t.matches === 'function' && t.matches('textarea, input')) return;
+  if (e.key === 'n') { e.preventDefault(); newNote(); }
+  else if (e.key === 'e') { e.preventDefault(); exportAll(); }
+  else if (e.key === 'i') { e.preventDefault(); $('#import-file').click(); }
+});
+
+/* sidebar 相對時間每 30s refresh */
+setInterval(() => { if (!saveTimer) { renderList(); renderFlow(); } }, 30000);
+
+/* ── boot ── */
+load();
+ensureNote();                                   // 無筆記 → 自動建空白
+if (!notes.find(n => n.id === curId)) {         // 存的 curId 失效 → 挑最新一份
+  curId = notes.slice().sort((a, b) => b.updatedAt - a.updatedAt)[0]?.id || null;
+}
+save();
+if (localStorage.getItem(SB_KEY) === '0') document.body.classList.remove('with-sidebar');
+renderList();
+renderFlow();
+setView(localStorage.getItem(VIEW_KEY) || 'editor');
+</script>
+
+</body>
+</html>

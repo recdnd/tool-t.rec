@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>bookmarks</title>
+  <style>
+    /* t-rec/bookmarks — 極簡個人書籤。整頁無標題/bar/提示，只有卡片 + 一個 ＋ 加卡。
+       資料存 localStorage（bmk-cards-v1，legacy key 保留）；封面上傳時 canvas 置中裁成固定 4:5 再存。
+       accent: --t-accent #0000ff = t-rec 工具箱共用動詞色 */
+    :root { --t-accent: #0000ff; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #ffffff;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Noto Sans TC", "PingFang TC", sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 18px;
+      padding: 22px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .card { position: relative; }
+    .cover {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 5;
+      border-radius: 9px;
+      overflow: hidden;
+      cursor: pointer;
+      background: transparent center / cover no-repeat;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+    }
+    /* 空封面置中的大 emoji（點本體切換，點外圍才上傳封面） */
+    .cover-empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: auto;
+    }
+    .cover-empty-emoji {
+      font-size: 34px;
+      line-height: 1;
+      opacity: 1;
+      cursor: pointer;
+      user-select: none;
+    }
+    /* 半透明圓角膠囊：浮在封面底部，裝書名 + accent 進度 */
+    .capsule {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      bottom: 8px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      -webkit-backdrop-filter: blur(3px);
+      backdrop-filter: blur(3px);
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .title, .note {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      outline: none;
+      font-family: inherit;
+      padding: 0;
+    }
+    .title {
+      font-size: 0.98rem;
+      font-weight: 700;
+      line-height: 1.25;
+      color: #000000;
+    }
+    .note {
+      font-size: 0.74rem;
+      line-height: 1.3;
+      color: var(--t-accent);
+    }
+    .del {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      opacity: 0;
+      cursor: pointer;
+      font-size: 0.8rem;
+      line-height: 1;
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.88);
+      user-select: none;
+    }
+    .card:hover .del { opacity: 0.65; }
+    .del:hover { opacity: 1; }
+    .add {
+      aspect-ratio: 4 / 5;
+      border: 0;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      background: none;
+    }
+    .add-icon {
+      font-size: 34px;
+      opacity: 0;
+    }
+    .add:hover .add-icon { opacity: 0.1; }
+    .add .add-icon:hover { opacity: 0.9; }
+
+    /* 空狀態逃生口：一張卡都沒有時，.add 是 #grid 的唯一子元素 —— 此時 ＋ 必須看得見，
+       否則整頁全白、沒有任何可點的東西（搬進 t-rec 前資料在 exe.rec.ooo，
+       localStorage 綁 origin 不會跟著搬，所以這裡永遠是從空的開始）。
+       有卡片之後回到原本的 ambient 行為（預設隱形、hover 才浮現）。 */
+    .add:only-child .add-icon { opacity: 0.22; }
+    .add:only-child:hover .add-icon { opacity: 0.5; }
+    .add:only-child .add-icon:hover { opacity: 0.9; }
+
+    /* 連結列：浮在膠囊正上方、靠右；對齊 /a 風格——純 emoji、無底色無框。
+       🔗 開連結（hover 書才出現）、✏️ 改連結（hover 🔗 才出現於左側） */
+    .linkbar {
+      position: absolute;
+      bottom: calc(100% + 3px);
+      right: 4px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      opacity: 0;
+    }
+    .card:hover .linkbar { opacity: 1; }
+    .linkbtn {
+      font-size: 0.95rem;
+      line-height: 1;
+      cursor: pointer;
+      user-select: none;
+      opacity: 0.85;
+    }
+    .linkbtn:hover { opacity: 1; }
+    .link-edit { opacity: 0; }                       /* ✏️ 只在 hover 連結列（🔗）時冒出 */
+    .linkbar:hover .link-edit { opacity: 0.85; }
+    .linkbar:hover .link-edit:hover { opacity: 1; }
+    .link-input {
+      display: none;
+      width: 100%;
+      margin-top: 2px;
+      border: 0;
+      border-top: 1px solid rgba(0, 0, 0, 0.1);
+      background: transparent;
+      outline: none;
+      font-family: inherit;
+      font-size: 0.7rem;
+      color: var(--t-accent);
+      padding: 3px 0 0;
+    }
+    .link-input.show { display: block; }
+  </style>
+</head>
+<body>
+  <div id="grid"></div>
+  <script>
+    (function () {
+      var KEY = "bmk-cards-v1";   // legacy key，刻意不改：換 key 會丟既有書籤
+      var EMPTY_EMOJIS = ["📕", "📗", "📘", "📙", "📚", "📖"];
+      var DEFAULT_EMPTY_EMOJI = "📖";
+      var COVER_W = 400, COVER_H = 500;          // 固定 4:5 封面尺寸（扁一點）
+      var grid = document.getElementById("grid");
+      var cards = load();
+
+      function load() {
+        try { var a = JSON.parse(localStorage.getItem(KEY) || "[]"); return Array.isArray(a) ? a : []; }
+        catch (e) { return []; }
+      }
+      function save() {
+        try { localStorage.setItem(KEY, JSON.stringify(cards)); } catch (e) { /* quota */ }
+      }
+      function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+      function nextEmptyEmoji(cur) {
+        var i = EMPTY_EMOJIS.indexOf(cur);
+        if (i < 0) return EMPTY_EMOJIS[0];
+        return EMPTY_EMOJIS[(i + 1) % EMPTY_EMOJIS.length];
+      }
+
+      // 書名 / 進度用真的 <input>，確保一定可編輯、不會有 contenteditable 的層級/focus 問題
+      function mkInput(cls, field, card, placeholder) {
+        var inp = document.createElement("input");
+        inp.type = "text";
+        inp.className = cls;
+        inp.spellcheck = false;
+        if (placeholder) inp.placeholder = placeholder;
+        inp.value = card[field] || "";
+        inp.addEventListener("input", function () { card[field] = inp.value; save(); });
+        return inp;
+      }
+
+      function makeCard(card) {
+        var el = document.createElement("div");
+        el.className = "card";
+
+        var cover = document.createElement("div");
+        cover.className = "cover";
+        if (card.cover) {
+          cover.style.backgroundImage = "url(" + card.cover + ")";
+        } else {
+          var empty = document.createElement("div");
+          empty.className = "cover-empty";
+          var emoji = document.createElement("span");
+          emoji.className = "cover-empty-emoji";
+          emoji.textContent = card.emoji || DEFAULT_EMPTY_EMOJI;
+          emoji.addEventListener("click", function (e) {
+            e.stopPropagation();
+            card.emoji = nextEmptyEmoji(card.emoji || DEFAULT_EMPTY_EMOJI);
+            emoji.textContent = card.emoji;
+            save();
+          });
+          empty.appendChild(emoji);
+          cover.appendChild(empty);
+        }
+        cover.addEventListener("click", function () { pickCover(card); });
+
+        // 半透明膠囊浮在封面上，裝書名 + accent 進度；點膠囊只編輯、不觸發換封面
+        var capsule = document.createElement("div");
+        capsule.className = "capsule";
+        capsule.addEventListener("click", function (e) { e.stopPropagation(); });
+        capsule.appendChild(mkInput("title", "title", card));
+        capsule.appendChild(mkInput("note", "note", card));
+
+        // 連結編輯框（隱藏，編輯時冒出當第三行；全在書本內完成、無彈窗）
+        var linkInput = document.createElement("input");
+        linkInput.type = "text";
+        linkInput.className = "link-input";
+        linkInput.spellcheck = false;
+        linkInput.value = card.link || "";
+        linkInput.addEventListener("input", function () { card.link = linkInput.value; save(); });
+        linkInput.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); linkInput.blur(); }
+        });
+        linkInput.addEventListener("blur", function () { linkInput.classList.remove("show"); });
+        capsule.appendChild(linkInput);
+
+        function startLinkEdit() {
+          linkInput.classList.add("show");
+          linkInput.focus();
+          linkInput.select();   // 預設全選，方便複製貼上
+        }
+
+        // 右上角連結列：✏️（左，改連結） + 🔗（右，開連結）
+        var linkbar = document.createElement("div");
+        linkbar.className = "linkbar";
+        linkbar.addEventListener("click", function (e) { e.stopPropagation(); });
+
+        var editBtn = document.createElement("span");
+        editBtn.className = "linkbtn link-edit";
+        editBtn.textContent = "✏️";
+        editBtn.title = "改連結";
+        editBtn.addEventListener("click", function (e) { e.stopPropagation(); startLinkEdit(); });
+
+        var goBtn = document.createElement("span");
+        goBtn.className = "linkbtn link-go";
+        goBtn.textContent = "🔗";
+        goBtn.title = "開連結";
+        goBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          var u = (card.link || "").trim();
+          if (!u) { startLinkEdit(); return; }   // 還沒設就先進編輯
+          if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+          window.open(u, "_blank", "noopener");
+        });
+
+        linkbar.appendChild(editBtn);
+        linkbar.appendChild(goBtn);
+        capsule.appendChild(linkbar);
+
+        cover.appendChild(capsule);
+
+        el.appendChild(cover);
+
+        var del = document.createElement("div");
+        del.className = "del";
+        del.textContent = "✕";
+        del.title = "刪除";
+        del.addEventListener("click", function () {
+          cards = cards.filter(function (c) { return c.id !== card.id; });
+          save(); render();
+        });
+        el.appendChild(del);
+
+        return el;
+      }
+
+      function makeAdd() {
+        var el = document.createElement("div");
+        el.className = "add";
+        var icon = document.createElement("span");
+        icon.className = "add-icon";
+        icon.textContent = "＋";
+        el.appendChild(icon);
+        el.addEventListener("click", function () {
+          cards.push({ id: uid(), title: "", note: "", cover: "", emoji: DEFAULT_EMPTY_EMOJI, link: "" });
+          save(); render();
+        });
+        return el;
+      }
+
+      function pickCover(card) {
+        var input = document.createElement("input");
+        input.type = "file";
+        input.accept = "image/*";
+        input.addEventListener("change", function () {
+          var file = input.files && input.files[0];
+          if (!file) return;
+          var reader = new FileReader();
+          reader.onload = function () {
+            cropImage(reader.result, function (dataUrl) { card.cover = dataUrl; save(); render(); });
+          };
+          reader.readAsDataURL(file);
+        });
+        input.click();
+      }
+
+      // 置中裁成 2:3 + 縮放到固定尺寸，存成較小的 JPEG dataURL（避免撐爆 localStorage）
+      function cropImage(src, cb) {
+        var img = new Image();
+        img.onload = function () {
+          var targetRatio = COVER_W / COVER_H;
+          var srcRatio = img.width / img.height;
+          var sx, sy, sw, sh;
+          if (srcRatio > targetRatio) { sh = img.height; sw = sh * targetRatio; sx = (img.width - sw) / 2; sy = 0; }
+          else { sw = img.width; sh = sw / targetRatio; sx = 0; sy = (img.height - sh) / 2; }
+          var canvas = document.createElement("canvas");
+          canvas.width = COVER_W; canvas.height = COVER_H;
+          canvas.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, COVER_W, COVER_H);
+          try { cb(canvas.toDataURL("image/jpeg", 0.82)); }
+          catch (e) { cb(src); }   // 跨域等失敗就退回原圖
+        };
+        img.src = src;
+      }
+
+      function render() {
+        grid.innerHTML = "";
+        cards.forEach(function (c) { grid.appendChild(makeCard(c)); });
+        grid.appendChild(makeAdd());
+      }
+
+      render();
+    })();
+  </script>
+</body>
+</html>

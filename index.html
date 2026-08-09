@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>t-rec</title>
+  <style>
+    body {
+      margin: 0;
+      background: #fff;
+      color: #111;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      padding: 24px;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+    }
+
+    pre {
+      margin: 0;
+      text-align: center;
+      background: rgba(0, 0, 0, 0.05);
+      border: 0;
+      padding: 12px 16px;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .site-line:hover {
+      background: #0000ff;
+      color: #fff;
+    }
+
+    .site-note {
+      display: none;
+      opacity: 0.8;
+    }
+
+    .site-line:hover .site-note {
+      display: inline;
+    }
+
+    /* MANUAL 是「就地展開」不是「導向連結」——故**不掛** .site-note 的 " -> /dir" 格式。
+       hover 只反底表示可點，內容不變；點擊才在同一個灰底框內展開全文。 */
+    .manual-body {
+      text-align: left;
+      opacity: 0.85;
+    }
+
+    .by a:hover { color: #0000ff; }
+
+    /* 底框寬度基準：撐出「最長 hover 行」的寬度，使 hover 時底框不再伸縮。
+       只涵蓋導向連結（會因 hover 加字而變寬的那些）；MANUAL 展開是刻意的動作，
+       底框跟著變寬是預期行為，不算 hover 抖動。
+       內容須與上方各行（含 note）逐字同步，改一邊要改兩邊。 */
+    .site-sizer {
+      display: block;
+      height: 0;
+      overflow: hidden;
+      visibility: hidden;
+    }
+  </style>
+</head>
+<body>
+  <!-- 維護註記：此頁沿用 pp-bin.bin 首頁的 UI 與設計語言（居中 <pre>、淡灰透明底框、hover 整行反底、
+       .site-note 於 hover 才追加 " -> /dir"、.site-sizer 固定底框寬度、就地展開不離開本頁）。
+       非使用者明確要求時，請勿調整字號、版型、顏色、行高、padding 或結構。
+       ⚠️ 本頁的設計**不從 t-rec/ 底下的工具推導**——工具箱不統一畫風，各工具保有自己的風格。
+
+       行文案規則（兩類，不可混用）：
+         · 導向連結 → hover 前顯示「name」，hover 後追加「 -> /dir」；須同步 .site-sizer。
+         · 就地展開 → 只顯示標籤（MANUAL），**不得**用 " -> /dir" 格式，也不進 sizer。
+
+       MANUAL 分層（詳見 sov/machine/specs/19-toolbox.md「MANUAL 規格」）：
+         · 本頁 MANUAL = 給一般使用者，寫「這站是什麼 / 每個工具幹什麼」，全英語、純功能性描述。
+         · **不寫操作步驟**——那屬於各工具自己的種子內容（notes 的初始筆記、bookmarks 的示例卡）。
+         · 本頁**不連 README**——README 是給開發者看的，不該出現在使用者入口。
+
+       新增工具＝這裡加一行 site-line 錨點 ＋ 同步 site-sizer ＋ MANUAL 加一段 ＋ 更新 README.md 成員表。 -->
+  <pre>t-rec toolbox
+
+<a class="site-line" href="notes/">notes<span class="site-note"> -> /notes</span></a>
+<a class="site-line" href="bookmarks/">bookmarks<span class="site-note"> -> /bookmarks</span></a>
+<a class="site-line" href="#manual" id="manual-toggle">MANUAL</a><span id="manual" hidden><span class="manual-body">
+
+t-rec is a toolbox. Each tool does one thing and lives
+in its own folder. No account, no server, no tracking.
+
+  notes       Plain-text notes. Saves while you type.
+              Two layouts: one note at a time, or all
+              of them at once as cards. Export the lot
+              to a single .md file.
+
+  bookmarks   Links as cover cards. A card holds an
+              image, a title, a progress line, a URL.
+
+Every tool starts empty and keeps its data in this
+browser only. Nothing follows you to another browser,
+another device, or another address.
+
+</span><span class="by">BY <a href="https://rec.ooo">REC DUNGEONS</a></span>
+<a class="site-line" href="#" id="manual-back">↩︎</a></span>
+<span class="site-sizer" aria-hidden="true">notes -> /notes
+bookmarks -> /bookmarks</span></pre>
+
+  <script>
+    (function () {
+      var manual = document.getElementById("manual");
+      var open = document.getElementById("manual-toggle");
+      var back = document.getElementById("manual-back");
+      function set(shown) {
+        manual.hidden = !shown;
+        open.hidden = shown;          // 展開時收起入口行，避免同時出現兩個 MANUAL 標籤
+      }
+      open.addEventListener("click", function (e) { e.preventDefault(); set(true); });
+      back.addEventListener("click", function (e) { e.preventDefault(); set(false); });
+    })();
+  </script>
+</body>
+</html>
