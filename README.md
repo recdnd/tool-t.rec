@@ -17,7 +17,7 @@
 
 | 工具 | 一句話 | 代表色 | 原位置 |
 |---|---|---|---|
-| [`notes/`](./notes/) | 簡單記事本，寫作 + 自動儲存 + 匯出單檔 `.md` | `#00ff5e` 系統綠 | `CommonLibrary/memo-rec/` |
+| [`notes/`](./notes/) | 簡單記事本，寫作 + 自動儲存 + 匯出單檔 `.md` | `#00ff5e` 主題綠 | `CommonLibrary/memo-rec/` |
 | [`bookmarks/`](./bookmarks/) | 極簡書籤 / 書櫃，封面卡片 + 進度 + 連結 | `#0000ff` | `exe-rec/b/`（BMK） |
 
 `notes` 的前端對齊 b-rec / lib-rec 家族語言；`bookmarks` 維持自己的卡片風格。
@@ -104,7 +104,7 @@
 
 1. **刪 favicon** —— 不掛個體 emoji / icon。（`notes` 的 📝、`bookmarks` 的 🔖 皆已刪）
 2. **收斂為單一 accent** —— 一個工具只准一個強調色。
-   `notes` 原 `#ff0000` → 現 `--accent: #00ff5e`（系統綠，對齊 b-rec token 命名）；
+   `notes` 原 `#ff0000` → 現 `--accent: #00ff5e`（主題綠，對齊 b-rec token 命名）；
    `bookmarks` 原 `--bmk-red #e2402f` + `#1a6fd4` → 現 `--t-accent: #0000ff`。
 3. **刪反向導鏈** —— 原專案首頁指向它的連結、轉址頁、docs 條目全部移除。舊網址**不做轉址**。
 4. **去代號** —— 縮寫代號（BMK 之類）改成語意詞（`bookmarks`）。資料夾名 = 工具名 = `<title>`。

@@ -75,7 +75,7 @@ updated: 2026-06-01T04:15:00.000Z
 
 ### 代表色
 
-`--accent: #00ff5e`（notes 系統綠）。同家族：b-rec 系統藍 `#0000ff`、lib-rec 系統紅 `#fc036b`。
+`--accent: #00ff5e`（notes 主題綠）。同家族：b-rec 系統藍 `#0000ff`、lib-rec 主題紅 `#fc036b`。
 
 > ⚠️ **`#00ff5e` 在白底上對比只有 1.36:1，不能拿來寫字。**
 > 所以家族語言中「accent 當文字色」的位置（sidebar hover / active），
