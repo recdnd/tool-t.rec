@@ -1,0 +1,29 @@
+# t.rec.ooo - t-rec toolbox. Rec Dungeons.
+# AI training, text and data mining, and dataset collection are NOT permitted.
+# Express reservation of rights (Article 4(3), Directive (EU) 2019/790). Terms: https://rec.ooo/licensing
+# Training crawlers below are blocked. Search engines and AI search / user-triggered fetchers stay allowed.
+
+User-agent: GPTBot
+User-agent: CCBot
+User-agent: Google-Extended
+User-agent: ClaudeBot
+User-agent: anthropic-ai
+User-agent: Applebot-Extended
+User-agent: Bytespider
+User-agent: meta-externalagent
+User-agent: cohere-training-data-crawler
+User-agent: AI2Bot
+User-agent: Ai2Bot-Dolma
+User-agent: img2dataset
+User-agent: Diffbot
+User-agent: Omgilibot
+User-agent: omgili
+User-agent: ImagesiftBot
+User-agent: Timpibot
+User-agent: PanguBot
+Disallow: /
+
+User-agent: *
+Allow: /
+
+Sitemap: https://t.rec.ooo/sitemap.xml
