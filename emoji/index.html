@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>emoji</title>
+<meta name="description" content="Every Unicode emoji on one page. Click to copy, search by English, Chinese or Japanese keywords, switch to Twemoji, pick a skin tone, and keep the last 20 you copied. No account; nothing leaves your browser.">
+<meta name="keywords" content="emoji, copy emoji, emoji picker, emoji search, twemoji, unicode emoji, skin tone, 絵文字, 表情符號">
+<link rel="canonical" href="https://t.rec.ooo/emoji/">
+<meta property="og:title" content="emoji - t-rec">
+<meta property="og:description" content="Every Unicode emoji on one page. Click to copy, search by English, Chinese or Japanese keywords, switch to Twemoji, pick a skin tone, and keep the last 20 you copied.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://t.rec.ooo/emoji/">
+<meta property="og:site_name" content="t-rec">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "emoji",
+  "url": "https://t.rec.ooo/emoji/",
+  "description": "Every Unicode emoji on one page. Click to copy, search by English, Chinese or Japanese keywords, switch to Twemoji, pick a skin tone, and keep the last 20 you copied. No account; nothing leaves your browser.",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "Web",
+  "browserRequirements": "Requires JavaScript",
+  "inLanguage": "en",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "isPartOf": { "@type": "WebSite", "name": "t-rec", "url": "https://t.rec.ooo/" }
+}
+</script>
+<link rel="icon" href="../icons/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../icons/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<style>
+  /* t-rec/emoji
+     色: t-rec 主題綠 #00ff5e 只當底(透明階), 不當字(白底 1.36:1 讀不到).
+         右上兩顆燈泡走系統藍 / 系統紅(狀態), 其餘字一律黑 + 一階淡黑(分組名).
+     手勢: 格子 = 可按條家族去掉靜置底(上千格靜置都上色會變棋盤), hover .18 / 按住 .28.
+           搜尋格 = 輕指 .05 / focus .09, 底用透明黑(中性, 不佔主題色).
+     複製回饋: 被點的那格換成 ✅ 0.5 秒(setTimeout 換字, 不是動畫), 最近列同時更新. */
+  :root {
+    --k: 0, 255, 94;            /* 主題綠 */
+    --ink: #000;
+    --ink-dim: rgba(0, 0, 0, .62);
+    --sys-blue: #0000ff;
+    --sys-red: #ff0000;
+    --emo: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+    --head: 80px;               /* JS 量真值後覆寫, 給分組標的 scroll-margin */
+  }
+  * { box-sizing: border-box; }
+  button, input, select, textarea { border: 0; margin: 0; font: inherit; color: inherit; background: none; }
+  html { scroll-padding-top: var(--head); }
+  body {
+    margin: 0;
+    background: #fff;
+    color: var(--ink);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 13px;
+  }
+
+  /* 懸浮外殼: 毛玻璃 .50 */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: rgba(255, 255, 255, .5);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    padding: 4px 4px 2px;
+  }
+  .row { display: flex; align-items: center; gap: 2px; min-height: 34px; padding-right: 112px; }  /* 預留給右上燈泡列 */
+  #recent { overflow: hidden; }
+  #recent:empty { display: none; }
+  #recent:not(:empty) + .row { padding-right: 0; }
+
+  #q {
+    flex: 0 1 190px;
+    min-width: 64px;
+    height: 24px;
+    padding: 1px 4px;
+    background: rgba(0, 0, 0, .05);
+    outline: none;
+  }
+  #q:hover, #q:focus { background: rgba(0, 0, 0, .09); }
+  #q::placeholder { opacity: 1; }
+  #q::-webkit-search-cancel-button { display: none; }
+
+  /* 分組跳轉: 極簡 emoji 按鈕 */
+  nav { display: flex; gap: 2px; margin-left: 4px; flex-wrap: wrap; flex: 0 1 auto; }
+  nav button {
+    padding: 0;
+    font-family: var(--emo);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+    opacity: .8;
+  }
+  nav button:hover, nav button:focus-visible, nav button:active { opacity: 1; outline: none; }
+
+  /* 燈泡列(頂部工具欄模組: 右上 2px, 鈕間 2px) */
+  .rail {
+    position: fixed;
+    top: calc(2px + env(safe-area-inset-top));
+    right: calc(2px + env(safe-area-inset-right));
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .bulb {
+    border: 1px solid currentColor;  /* 條例豁免: 燈泡模組方形變體的 1px 框 */
+    padding: 1px 4px;
+    font-size: 10px;
+    line-height: 14px;
+    height: 18px;
+    color: var(--sys-blue);
+    cursor: pointer;
+    user-select: none;
+  }
+  .bulb.emo-glyph { font-family: var(--emo); }
+  .bulb:hover, .bulb:focus-visible, .bulb.on { color: var(--sys-red); outline: none; }
+  .bulb.on:hover, .bulb.on:focus-visible { background: #000; color: #fff; border-color: var(--sys-red); }
+
+  main { padding: 0 4px 4px; }
+  h2 {
+    margin: 0;
+    padding: 4px 0 2px;
+    font-size: 10px;
+    font-weight: normal;
+    color: var(--ink-dim);
+    scroll-margin-top: var(--head);
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, 38px); gap: 2px; }
+  .em {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--emo);
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+  }
+  .em[hidden] { display: none; }
+  .em img { width: 26px; height: 26px; display: block; pointer-events: none; }
+  .em:hover, .em:focus-visible { background: rgba(var(--k), .18); outline: none; }
+  .em:active { background: rgba(var(--k), .28); }
+
+  #credit { margin: 0; padding: 4px; font-size: 10px; color: var(--ink-dim); }
+  #credit a { color: inherit; }
+  #credit a:hover { color: var(--sys-red); }
+</style>
+</head>
+<body>
+<header id="head">
+  <div class="row" id="recent" aria-label="recent"></div>
+  <div class="row">
+    <input id="q" type="search" placeholder="🔍" autocomplete="off" spellcheck="false" aria-label="search">
+    <nav id="nav" aria-label="groups"></nav>
+  </div>
+</header>
+<div class="rail" role="toolbar" aria-label="tools">
+  <button type="button" class="bulb emo-glyph" id="tone" aria-label="skin tone">✋</button>
+  <button type="button" class="bulb" id="tw" aria-label="twemoji">twemoji</button>
+</div>
+<main id="list"></main>
+<p id="credit">Twemoji graphics: <a href="https://github.com/jdecked/twemoji">jdecked/twemoji</a>, CC-BY 4.0</p>
+<script src="data.js"></script>
+<script>
+(function () {
+  "use strict";
+  // localStorage: 最近 20 沿用舊 emoji-rec 的 key; 偏好(twemoji / 膚色 / 搜尋字 / 捲動位置)另一個 key.
+  // 前端條例 20: 硬重整回到上次所在點. 讀寫都包 try, 讀不到就照預設開.
+  var RECENT_KEY = "emoji-recent-v1", PREF_KEY = "t-emoji-v1", MAX = 20;
+  var TW = "https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/";
+  var TONES = ["✋", "✋🏻", "✋🏼", "✋🏽", "✋🏾", "✋🏿"];
+  var D = window.EMOJI;
+
+  function load(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
+  function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  var pref = Object.assign({ tw: false, tone: 0, q: "", y: 0 }, load(PREF_KEY, {}));
+  var recent = load(RECENT_KEY, []);
+  if (!Array.isArray(recent)) recent = [];
+  function savePref() { save(PREF_KEY, pref); }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var head = $("head"), list = $("list"), recentEl = $("recent"), q = $("q"), nav = $("nav");
+  var toneBtn = $("tone"), twBtn = $("tw");
+
+  // ---- 本機字型畫不畫得出來: 畫不出的換 twemoji 圖, 兩邊都沒有才藏 ----
+  // 用紅色 fillStyle 畫: 彩色 emoji 字形不吃 fillStyle, 一般字形 / 缺字框會是純紅.
+  // ZWJ 序列不支援時會拆成幾顆並排, 用寬度抓.
+  var cv = document.createElement("canvas"); cv.width = cv.height = 24;
+  var cx = cv.getContext("2d", { willReadFrequently: true });
+  cx.font = '20px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  cx.textBaseline = "top";
+  var refW = cx.measureText("😀").width || 20, okCache = new Map();
+  function nativeOK(ch) {
+    var hit = okCache.get(ch);
+    if (hit !== undefined) return hit;
+    var ok = false, w = cx.measureText(ch).width;
+    if (w > 0 && w < refW * 1.45) {
+      cx.clearRect(0, 0, 24, 24); cx.fillStyle = "#f00"; cx.fillText(ch, 0, 0);
+      var d = cx.getImageData(0, 0, 24, 24).data;
+      for (var i = 0; i < d.length; i += 4) {
+        if (d[i + 3] > 40 && !(d[i] > 0 && d[i + 1] === 0 && d[i + 2] === 0)) { ok = true; break; }
+      }
+    }
+    okCache.set(ch, ok);
+    return ok;
+  }
+  function twName(ch) {
+    var s = ch.indexOf("‍") < 0 ? ch.replace(/️/g, "") : ch, out = [];
+    for (var c of s) out.push(c.codePointAt(0).toString(16));
+    return out.join("-");
+  }
+
+  // ---- 一格 ----
+  function face(it) { return pref.tone && it[3] ? it[3][pref.tone - 1] : it[0]; }
+  function fill(btn, ch) {
+    btn.textContent = "";
+    if (pref.tw || !nativeOK(ch)) {
+      var img = new Image();
+      img.alt = ch; img.loading = "lazy"; img.decoding = "async"; img.draggable = false;
+      img.onerror = function () { if (pref.tw && nativeOK(ch)) btn.textContent = ch; else btn.hidden = true; };
+      img.src = TW + twName(ch) + ".svg";
+      btn.appendChild(img);
+    } else {
+      btn.textContent = ch;
+    }
+  }
+  function tile(ch, name) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "em";
+    b.dataset.ch = ch;
+    if (name) { b.title = name; b.setAttribute("aria-label", name); }
+    fill(b, ch);
+    return b;
+  }
+
+  // ---- 複製 ----
+  function copy(ch, btn) {
+    var done = function () {
+      recent = [ch].concat(recent.filter(function (x) { return x !== ch; })).slice(0, MAX);
+      save(RECENT_KEY, recent);
+      renderRecent();
+      if (btn && btn.isConnected) {
+        btn.textContent = "✅";
+        setTimeout(function () { if (btn.isConnected) fill(btn, btn.dataset.ch); }, 500);
+      }
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(ch).then(done, function () { legacy(ch); done(); });
+    } else { legacy(ch); done(); }
+  }
+  function legacy(ch) {
+    try {
+      var t = document.createElement("textarea");
+      t.value = ch; t.style.position = "fixed"; t.style.opacity = "0";
+      document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove();
+    } catch (e) {}
+  }
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest(".em");
+    if (!b) return;
+    var inRecent = recentEl.contains(b);
+    copy(b.dataset.ch, inRecent ? null : b);
+  });
+
+  // ---- 名字查表(最近列 hover 要名字) ----
+  var nameOf = new Map(), all = [];
+  D.g.forEach(function (g, gi) {
+    g.e.forEach(function (it) {
+      it.s = it[1] + "|" + it[2];   // 搜尋用
+      it.g = gi;
+      all.push(it);
+      nameOf.set(it[0], it[1]);
+      if (it[3]) it[3].forEach(function (v) { nameOf.set(v, it[1]); });
+    });
+  });
+
+  function renderRecent() {
+    recentEl.textContent = "";
+    recent.forEach(function (ch) { recentEl.appendChild(tile(ch, nameOf.get(ch) || ch)); });
+  }
+
+  function gridOf(items) {
+    var grid = document.createElement("div");
+    grid.className = "grid";
+    items.forEach(function (it) { grid.appendChild(tile(face(it), it[1])); });
+    return grid;
+  }
+  function renderAll() {
+    var f = document.createDocumentFragment();
+    D.g.forEach(function (g, gi) {
+      var h = document.createElement("h2");
+      h.id = "g" + gi; h.textContent = g.n;
+      f.appendChild(h);
+      f.appendChild(gridOf(g.e));
+    });
+    list.textContent = "";
+    list.appendChild(f);
+  }
+  // 排序: 英文名整字 0 / 英文名字首 1 / 關鍵字整個 2 / 關鍵字字首 3 / 其他包含 4; 多個詞取最差的那個.
+  // 同分照 Unicode 原順序. 貼一顆 emoji 進來也找得到(含膚色版).
+  // CLDR 日文關鍵字多半是片假名(ネコ), 打平假名(ねこ)也要找得到
+  function kata(t) { return t.replace(/[\u3041-\u3096]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) + 0x60); }); }
+  function esc(t) { return t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+  function score(it, t) {
+    if (it[0] === t || (it[3] && it[3].indexOf(t) >= 0)) return 0;
+    var name = it[1].toLowerCase(), e = esc(t);
+    if (new RegExp("(^|[^a-z0-9])" + e + "($|[^a-z0-9])").test(name)) return 0;
+    if (new RegExp("(^|[^a-z0-9])" + e).test(name)) return 1;
+    var kw = "|" + it[2] + "|";
+    if (kw.indexOf("|" + t + "|") >= 0) return 2;
+    if (kw.indexOf("|" + t) >= 0) return 3;
+    return it.s.indexOf(t) >= 0 ? 4 : -1;
+  }
+  function results() {
+    var terms = pref.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (!terms.length) return null;
+    var hit = [];
+    all.forEach(function (it, n) {
+      var worst = 0;
+      for (var i = 0; i < terms.length; i++) {
+        var sc = score(it, terms[i]), k = kata(terms[i]);
+        if (k !== terms[i]) { var sk = score(it, k); if (sk >= 0 && (sc < 0 || sk < sc)) sc = sk; }
+        if (sc < 0) return;
+        if (sc > worst) worst = sc;
+      }
+      hit.push([worst, n, it]);
+    });
+    hit.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    return hit.map(function (h) { return h[2]; });
+  }
+  function render() {
+    var r = results();
+    if (!r) { renderAll(); return; }
+    list.textContent = "";
+    list.appendChild(gridOf(r));
+  }
+
+  // ---- 控制 ----
+  D.g.forEach(function (g, gi) {
+    var b = document.createElement("button");
+    b.type = "button"; b.textContent = g.i; b.setAttribute("aria-label", g.n);
+    b.addEventListener("click", function () {
+      if (pref.q) { pref.q = ""; q.value = ""; savePref(); render(); }
+      var h = $("g" + gi);
+      if (h) h.scrollIntoView();
+    });
+    nav.appendChild(b);
+  });
+
+  var qTimer = 0;
+  q.value = pref.q;
+  q.addEventListener("input", function () {
+    clearTimeout(qTimer);
+    qTimer = setTimeout(function () { pref.q = q.value; savePref(); render(); window.scrollTo(0, 0); }, 60);
+  });
+  q.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {   // Enter = 複製第一個結果
+      e.preventDefault();
+      clearTimeout(qTimer); pref.q = q.value; savePref(); render();
+      var first = list.querySelector(".em:not([hidden])");
+      if (first) copy(first.dataset.ch, first);
+    } else if (e.key === "Escape") {
+      q.value = ""; pref.q = ""; savePref(); render();
+    }
+  });
+  document.addEventListener("keydown", function (e) {  // 任何地方直接打字就進搜尋格
+    if (document.activeElement === q || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key.length === 1 && e.key !== " ") q.focus();
+  });
+
+  function paintBulbs() {
+    toneBtn.textContent = TONES[pref.tone];
+    twBtn.classList.toggle("on", !!pref.tw);
+    twBtn.setAttribute("aria-pressed", pref.tw ? "true" : "false");
+  }
+  toneBtn.addEventListener("click", function () {
+    pref.tone = (pref.tone + 1) % TONES.length; savePref(); paintBulbs();
+    var y = window.scrollY; render(); window.scrollTo(0, y);
+  });
+  twBtn.addEventListener("click", function () {
+    pref.tw = !pref.tw; savePref(); paintBulbs();
+    var y = window.scrollY; render(); renderRecent(); window.scrollTo(0, y);
+  });
+
+  // ---- 捲動位置 ----
+  var sTick = 0;
+  window.addEventListener("scroll", function () {
+    if (sTick) return;
+    sTick = requestAnimationFrame(function () { sTick = 0; pref.y = Math.round(window.scrollY); savePref(); });
+  }, { passive: true });
+  window.addEventListener("pagehide", function () { pref.y = Math.round(window.scrollY); savePref(); });
+
+  function measureHead() { document.documentElement.style.setProperty("--head", head.offsetHeight + "px"); }
+  window.addEventListener("resize", measureHead);
+
+  paintBulbs();
+  renderRecent();
+  render();
+  measureHead();
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  if (location.hash && $(location.hash.slice(1))) $(location.hash.slice(1)).scrollIntoView();
+  else window.scrollTo(0, pref.y || 0);
+  if (!pref.y) q.focus({ preventScroll: true });
+})();
+</script>
+</body>
+</html>

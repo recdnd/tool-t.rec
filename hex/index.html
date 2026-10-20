@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hex</title>
+<meta name="description" content="A hex color picker. Drag to pick, type or paste a hex code, click to copy it as hex, rgb() or hsl(), pick from the screen where the browser allows it, and keep the last 20 colors you copied. No account; nothing leaves your browser.">
+<meta name="keywords" content="hex color picker, color picker, hex code, rgb to hex, hex to rgb, hsl, eyedropper, colour picker">
+<link rel="canonical" href="https://t.rec.ooo/hex/">
+<meta property="og:title" content="hex - t-rec">
+<meta property="og:description" content="A hex color picker. Drag to pick, type or paste a hex code, click to copy it as hex, rgb() or hsl(), and keep the last 20 colors you copied.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://t.rec.ooo/hex/">
+<meta property="og:site_name" content="t-rec">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "hex",
+  "url": "https://t.rec.ooo/hex/",
+  "description": "A hex color picker. Drag to pick, type or paste a hex code, click to copy it as hex, rgb() or hsl(), pick from the screen where the browser allows it, and keep the last 20 colors you copied. No account; nothing leaves your browser.",
+  "applicationCategory": "DesignApplication",
+  "operatingSystem": "Web",
+  "browserRequirements": "Requires JavaScript",
+  "inLanguage": "en",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "isPartOf": { "@type": "WebSite", "name": "t-rec", "url": "https://t.rec.ooo/" }
+}
+</script>
+<link rel="icon" href="../icons/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../icons/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<style>
+  /* t-rec/hex(與 t-rec/emoji 同一套手勢)
+     色: t-rec 主題綠 #00ff5e 只當可按條的底(透明階); 字一律黑. 畫面上其他顏色都是資料(挑出來的色).
+     手勢: 可按條(rgb / hsl / 最近色)靜置無底, hover .18 / 按住 .28; hex 輸入格 = 輕指 .05 / focus .09 透明黑.
+     複製回饋: 被點的那條換成 ✅ 0.5 秒(鎖寬, 不飄位), 最近列同時更新.
+     游標圈 / 色相線畫在 canvas 上, 不用 CSS 框. */
+  :root {
+    --k: 0, 255, 94;            /* 主題綠 */
+    --ink: #000;
+    --emo: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  button, input, select, textarea { border: 0; margin: 0; font: inherit; color: inherit; background: none; }
+  body {
+    margin: 0;
+    background: #fff;
+    color: var(--ink);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 13px;
+    padding: 4px;
+  }
+  #recent { display: flex; flex-wrap: wrap; gap: 2px; min-height: 26px; margin-bottom: 4px; }
+  #recent:empty { display: none; }
+  .sw { width: 26px; height: 26px; padding: 0; cursor: pointer; }
+  .sw:hover, .sw:focus-visible { outline: none; opacity: .8; }
+  .sw:active { opacity: .6; }
+
+  .wrap { display: flex; flex-wrap: wrap; gap: 4px; align-items: flex-start; }
+  canvas { display: block; touch-action: none; cursor: crosshair; }
+  #big { width: 128px; height: 128px; }
+
+  .vals { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+  .line { display: flex; align-items: center; gap: 3px; }
+  #hex {
+    width: 9ch;
+    padding: 1px;
+    background: rgba(0, 0, 0, .05);
+    outline: none;
+    text-transform: lowercase;
+  }
+  #hex:hover, #hex:focus { background: rgba(0, 0, 0, .09); }
+  .cp {
+    padding: 1px;
+    width: auto;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .cp:hover, .cp:focus-visible { background: rgba(var(--k), .18); outline: none; }
+  .cp:active { background: rgba(var(--k), .28); }
+  .key {
+    padding: 0;
+    font-family: var(--emo);
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+    opacity: .8;
+  }
+  .key:hover, .key:focus-visible, .key:active { opacity: 1; outline: none; }
+</style>
+</head>
+<body>
+<div id="recent" aria-label="recent"></div>
+<div class="wrap">
+  <canvas id="sv" width="240" height="240" aria-label="saturation and brightness"></canvas>
+  <canvas id="hue" width="18" height="240" aria-label="hue"></canvas>
+  <div class="vals">
+    <div id="big"></div>
+    <div class="line">
+      <input id="hex" maxlength="7" autocomplete="off" spellcheck="false" aria-label="hex">
+      <button type="button" class="key" id="copyhex" aria-label="copy hex">📑</button>
+      <button type="button" class="key" id="drop" aria-label="pick from screen" hidden>💧</button>
+    </div>
+    <button type="button" class="cp" id="rgb"></button>
+    <button type="button" class="cp" id="hsl"></button>
+  </div>
+</div>
+<script>
+(function () {
+  "use strict";
+  // localStorage: 最近 20(複製過的色) + 目前的色. 前端條例 20: 重整回到上次那個色. 讀寫包 try.
+  var RECENT_KEY = "hex-recent-v1", CUR_KEY = "t-hex-v1", MAX = 20;
+  function load(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
+  function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var sv = $("sv"), hue = $("hue"), big = $("big"), hexIn = $("hex"), rgbB = $("rgb"), hslB = $("hsl"), recentEl = $("recent");
+  var svx = sv.getContext("2d"), hx = hue.getContext("2d");
+  var recent = load(RECENT_KEY, []);
+  if (!Array.isArray(recent)) recent = [];
+
+  // ---- 色的換算 ----
+  function hsv2rgb(h, s, v) {
+    var f = function (n) { var k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+    return [f(5), f(3), f(1)].map(function (x) { return Math.round(x * 255); });
+  }
+  function rgb2hsv(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, h = 0;
+    if (d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    h = (h * 60 + 360) % 360;
+    return [h, mx ? d / mx : 0, mx];
+  }
+  function rgb2hsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn, s = 0, h = 0;
+    if (d) {
+      s = d / (1 - Math.abs(2 * l - 1));
+      h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h = (h * 60 + 360) % 360;
+    }
+    return [Math.round(h), Math.round(s * 100), Math.round(l * 100)];
+  }
+  function toHex(rgb) { return "#" + rgb.map(function (x) { return x.toString(16).padStart(2, "0"); }).join(""); }
+  function parseHex(t) {
+    var m = String(t).trim().replace(/^#/, "").toLowerCase();
+    if (/^[0-9a-f]{3}$/.test(m)) m = m.replace(/./g, "$&$&");
+    if (!/^[0-9a-f]{6}$/.test(m)) return null;
+    return [0, 2, 4].map(function (i) { return parseInt(m.slice(i, i + 2), 16); });
+  }
+
+  // ---- 狀態 ----
+  var cur = load(CUR_KEY, null);
+  var start = (cur && parseHex(cur.hex)) || [0, 255, 94];
+  var H, S, V;
+  (function () { var t = rgb2hsv(start[0], start[1], start[2]); H = cur && typeof cur.h === "number" && !t[1] ? cur.h : t[0]; S = t[1]; V = t[2]; })();
+
+  // ---- 畫 ----
+  function drawHue() {
+    var w = hue.width, h = hue.height, g = hx.createLinearGradient(0, 0, 0, h);
+    for (var i = 0; i <= 6; i++) g.addColorStop(i / 6, "hsl(" + (i * 60) + ",100%,50%)");
+    hx.fillStyle = g; hx.fillRect(0, 0, w, h);
+    var y = Math.round(H / 360 * (h - 1)) + .5;
+    hx.fillStyle = "#000"; hx.fillRect(0, y - 1.5, w, 3);
+    hx.fillStyle = "#fff"; hx.fillRect(0, y - .5, w, 1);
+  }
+  function drawSV() {
+    var w = sv.width, h = sv.height;
+    svx.fillStyle = "hsl(" + H + ",100%,50%)"; svx.fillRect(0, 0, w, h);
+    var g1 = svx.createLinearGradient(0, 0, w, 0); g1.addColorStop(0, "#fff"); g1.addColorStop(1, "rgba(255,255,255,0)");
+    svx.fillStyle = g1; svx.fillRect(0, 0, w, h);
+    var g2 = svx.createLinearGradient(0, 0, 0, h); g2.addColorStop(0, "rgba(0,0,0,0)"); g2.addColorStop(1, "#000");
+    svx.fillStyle = g2; svx.fillRect(0, 0, w, h);
+    var x = S * (w - 1), y = (1 - V) * (h - 1);
+    svx.lineWidth = 1;
+    svx.strokeStyle = "#000"; svx.beginPath(); svx.arc(x, y, 6, 0, Math.PI * 2); svx.stroke();
+    svx.strokeStyle = "#fff"; svx.beginPath(); svx.arc(x, y, 5, 0, Math.PI * 2); svx.stroke();
+  }
+  function paint(fromInput) {
+    var rgb = hsv2rgb(H, S, V), hex = toHex(rgb), hsl = rgb2hsl(rgb[0], rgb[1], rgb[2]);
+    drawHue(); drawSV();
+    big.style.background = hex;
+    if (!fromInput) hexIn.value = hex;
+    rgbB.textContent = "rgb(" + rgb.join(", ") + ")";
+    hslB.textContent = "hsl(" + hsl[0] + ", " + hsl[1] + "%, " + hsl[2] + "%)";
+    save(CUR_KEY, { hex: hex, h: H });
+  }
+
+  // ---- 拖 ----
+  function drag(el, onMove) {
+    el.addEventListener("pointerdown", function (e) {
+      el.setPointerCapture(e.pointerId);
+      onMove(e);
+      var mv = function (ev) { onMove(ev); };
+      var up = function () { el.removeEventListener("pointermove", mv); el.removeEventListener("pointerup", up); el.removeEventListener("pointercancel", up); };
+      el.addEventListener("pointermove", mv); el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+    });
+  }
+  function clamp(x) { return Math.max(0, Math.min(1, x)); }
+  drag(sv, function (e) {
+    var r = sv.getBoundingClientRect();
+    S = clamp((e.clientX - r.left) / r.width); V = 1 - clamp((e.clientY - r.top) / r.height);
+    paint();
+  });
+  drag(hue, function (e) {
+    var r = hue.getBoundingClientRect();
+    H = clamp((e.clientY - r.top) / r.height) * 360; if (H >= 360) H = 359.9;
+    paint();
+  });
+
+  // ---- 輸入 ----
+  hexIn.addEventListener("input", function () {
+    var rgb = parseHex(hexIn.value);
+    if (!rgb) return;
+    var t = rgb2hsv(rgb[0], rgb[1], rgb[2]);
+    if (t[1]) H = t[0];
+    S = t[1]; V = t[2];
+    paint(true);
+  });
+  hexIn.addEventListener("paste", function (e) {   // 貼 "rgb(…)" / 帶空白的也收
+    var t = (e.clipboardData || window.clipboardData).getData("text"), m = t.match(/(\d{1,3})\D+(\d{1,3})\D+(\d{1,3})/);
+    if (!parseHex(t) && m && /rgb/i.test(t)) {
+      e.preventDefault();
+      hexIn.value = toHex([m[1], m[2], m[3]].map(function (x) { return Math.min(255, +x); }));
+      hexIn.dispatchEvent(new Event("input"));
+    }
+  });
+  hexIn.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); copy(hexIn.value, $("copyhex")); } });
+  hexIn.addEventListener("blur", function () { hexIn.value = toHex(hsv2rgb(H, S, V)); });
+
+  // ---- 複製 ----
+  function flash(btn) {
+    if (!btn) return;
+    var keep = btn.textContent, w = btn.offsetWidth;
+    btn.style.minWidth = w + "px";
+    btn.textContent = "✅";
+    setTimeout(function () { btn.textContent = btn.id === "rgb" || btn.id === "hsl" ? btn.dataset.now || keep : keep; btn.style.minWidth = ""; paint(document.activeElement === hexIn); }, 500);
+  }
+  function legacy(t) {
+    try {
+      var a = document.createElement("textarea");
+      a.value = t; a.style.position = "fixed"; a.style.opacity = "0";
+      document.body.appendChild(a); a.select(); document.execCommand("copy"); a.remove();
+    } catch (e) {}
+  }
+  function copy(text, btn) {
+    var hex = toHex(hsv2rgb(H, S, V));
+    var done = function () {
+      recent = [hex].concat(recent.filter(function (x) { return x !== hex; })).slice(0, MAX);
+      save(RECENT_KEY, recent);
+      renderRecent();
+      flash(btn);
+    };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, function () { legacy(text); done(); });
+    else { legacy(text); done(); }
+  }
+  $("copyhex").addEventListener("click", function () { copy(toHex(hsv2rgb(H, S, V)), this); });
+  rgbB.addEventListener("click", function () { copy(rgbB.textContent, rgbB); });
+  hslB.addEventListener("click", function () { copy(hslB.textContent, hslB); });
+
+  function renderRecent() {
+    recentEl.textContent = "";
+    recent.forEach(function (hex) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "sw"; b.style.background = hex; b.title = hex; b.setAttribute("aria-label", hex);
+      b.addEventListener("click", function () {   // 點舊色 = 換回那個色 + 再複製一次 hex
+        var rgb = parseHex(hex), t = rgb2hsv(rgb[0], rgb[1], rgb[2]);
+        if (t[1]) H = t[0];
+        S = t[1]; V = t[2];
+        paint();
+        copy(hex, null);
+      });
+      recentEl.appendChild(b);
+    });
+  }
+
+  // ---- 螢幕取色(只有支援 EyeDropper 的瀏覽器才出現) ----
+  if ("EyeDropper" in window) {
+    var drop = $("drop");
+    drop.hidden = false;
+    drop.addEventListener("click", function () {
+      new window.EyeDropper().open().then(function (r) {
+        var rgb = parseHex(r.sRGBHex);
+        if (!rgb) return;
+        var t = rgb2hsv(rgb[0], rgb[1], rgb[2]);
+        if (t[1]) H = t[0];
+        S = t[1]; V = t[2];
+        paint();
+      }, function () {});
+    });
+  }
+
+  renderRecent();
+  paint();
+})();
+</script>
+</body>
+</html>
