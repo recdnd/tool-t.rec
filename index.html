@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>t-rec</title>
-  <meta name="description" content="A toolbox of small single-purpose browser tools: plain-text notes and cover-card bookmarks. No account, no server; data stays in your browser.">
+  <meta name="description" content="A toolbox of small single-purpose browser tools: plain-text notes, cover-card bookmarks, an emoji copier and a hex color picker. No account, no server; data stays in your browser.">
   <link rel="canonical" href="https://t.rec.ooo/">
   <meta property="og:title" content="t-rec toolbox">
-  <meta property="og:description" content="A toolbox of small single-purpose browser tools: plain-text notes and cover-card bookmarks. No account, no server; data stays in your browser.">
+  <meta property="og:description" content="A toolbox of small single-purpose browser tools: plain-text notes, cover-card bookmarks, an emoji copier and a hex color picker. No account, no server; data stays in your browser.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://t.rec.ooo/">
   <meta property="og:site_name" content="t-rec">
@@ -18,7 +18,7 @@
     "@type": "WebSite",
     "name": "t-rec",
     "url": "https://t.rec.ooo/",
-    "description": "A toolbox of small single-purpose browser tools: plain-text notes and cover-card bookmarks. No account, no server; data stays in your browser.",
+    "description": "A toolbox of small single-purpose browser tools: plain-text notes, cover-card bookmarks, an emoji copier and a hex color picker. No account, no server; data stays in your browser.",
     "inLanguage": "en",
     "hasPart": [
       {
@@ -30,6 +30,16 @@
         "@type": "WebApplication",
         "name": "bookmarks",
         "url": "https://t.rec.ooo/bookmarks/"
+      },
+      {
+        "@type": "WebApplication",
+        "name": "emoji",
+        "url": "https://t.rec.ooo/emoji/"
+      },
+      {
+        "@type": "WebApplication",
+        "name": "hex",
+        "url": "https://t.rec.ooo/hex/"
       }
     ]
   }
@@ -119,6 +129,8 @@
 
 <a class="site-line" href="notes/">notes<span class="site-note"> -> /notes</span></a>
 <a class="site-line" href="bookmarks/">bookmarks<span class="site-note"> -> /bookmarks</span></a>
+<a class="site-line" href="emoji/">emoji<span class="site-note"> -> /emoji</span></a>
+<a class="site-line" href="hex/">hex<span class="site-note"> -> /hex</span></a>
 <a class="site-line" href="#manual" id="manual-toggle">MANUAL</a><span id="manual" hidden><span class="manual-body">
 
 t-rec is a toolbox. Each tool does one thing and lives
@@ -132,6 +144,13 @@ in its own folder. No account, no server, no tracking.
   bookmarks   Links as cover cards. A card holds an
               image, a title, a progress line, a URL.
 
+  emoji       Every emoji on one page. Click one to
+              copy it. Search, switch to Twemoji, pick
+              a skin tone. The last 20 stay on top.
+
+  hex         A color picker. Drag or type a hex code,
+              click to copy as hex, rgb() or hsl().
+
 Every tool starts empty and keeps its data in this
 browser only. Nothing follows you to another browser,
 another device, or another address.
@@ -139,7 +158,9 @@ another device, or another address.
 </span><span class="by">BY <a href="https://rec.ooo">REC DUNGEONS</a></span>
 <a class="site-line" href="#" id="manual-back">↩︎</a></span>
 <span class="site-sizer" aria-hidden="true">notes -> /notes
-bookmarks -> /bookmarks</span></pre>
+bookmarks -> /bookmarks
+emoji -> /emoji
+hex -> /hex</span></pre>
 
   <script>
     (function () {

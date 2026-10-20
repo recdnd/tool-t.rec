@@ -18,7 +18,9 @@
 | 工具 | 一句話 | 代表色 | 原位置 |
 |---|---|---|---|
 | [`notes/`](./notes/) | 簡單記事本，寫作 + 自動儲存 + 匯出單檔 `.md` | `#00ff5e` 主題綠 | `CommonLibrary/memo-rec/` |
-| [`bookmarks/`](./bookmarks/) | 極簡書籤 / 書櫃，封面卡片 + 進度 + 連結 | `#0000ff` | `exe-rec/b/`（BMK） |
+| [`bookmarks/`](./bookmarks/) | 極簡書籤 / 書櫃, 封面卡片 + 進度 + 連結 | `#0000ff` | `exe-rec/b/`(BMK) |
+| [`emoji/`](./emoji/) | emoji 複製中心, 全部 emoji + 搜尋(英 / 中 / 日)+ twemoji 切換 + 膚色 + 最近 20 個 | `#00ff5e` 只當底 | 新做(2026-10-18, dummy 03d7d961) |
+| [`hex/`](./hex/) | hex 色票, 拖拉 / 輸入 + 點擊複製 hex / rgb() / hsl() + 最近 20 色 | `#00ff5e` 只當底 | 新做(2026-10-18, dummy 03d7d961) |
 
 `notes` 的前端對齊 b-rec / lib-rec 家族語言；`bookmarks` 維持自己的卡片風格。
 **兩者刻意不統一** —— 見下方「畫風：不統一」。
