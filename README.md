@@ -85,7 +85,7 @@
 |---|---|---|
 | **已品牌化** | 有域名 / CNAME、自有配色、專屬 icon、對外掛名 | `kiln`（kiln.ooo）· `Ruvia`（ruvia.dev）· `lib-rec`（accent `#fc036b`、📖）· `b-rec`（📚） |
 | **規模超標** | 有 build / 依賴樹 / 多頁路由 / 後端 / 擴充套件 | `PD+FC` · `spiral` · `ArcDeploy_GUI` · `replit-remains` |
-| **明確個人服務目的** | 內容是 Rec 的資料或身份，換個人就沒意義 | `exe-rec`（**標準反例**）· `rechealth` · `mygraph` · `nest` · `rec-pf` · `s-rec` · `zenn-rec` |
+| **明確個人服務目的** | 內容是 Rec 的資料或身份，換個人就沒意義 | `exe-rec`（**標準反例**）· `rechealth` · `mygraph` · `nest` · `rec-pf` · `s-bin` · `zenn-rec` |
 | **內容庫，不是工具** | 主體是文件 / 素材 / 筆記，程式只是外殼 | `CommonLibrary` · `prompt` · `derivatives` · `mom-pack` · `baobao` · `Treasures` |
 | **基建** | 管的是機隊 / 部署 / 專案本身 | `sov/machine` · `sshtools` · `map-rec` · `park` |
 | **體量足以獨立成案** | 有獨特性 / 有規模 / 架構仍在演進，單獨拿出去撐得起一個專案 | `kiln` · `Ruvia` · `rechealth`（架構隨健康主題持續長，非固定） |
